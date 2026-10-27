@@ -185,3 +185,7 @@ cython_debug/
 /previous_checkpoints/cvae_03_06_best_64_64
 checkpoints.zip
 /previous_checkpoints/checkpoints_best_03_10
+
+# dlib landmark model, downloaded in Getting started (99 MB)
+shape_predictor_68_face_landmarks.dat
+shape_predictor_68_face_landmarks.dat.bz2

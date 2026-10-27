@@ -1,225 +1,164 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/banner-dark.png">
+  <img alt="The University of Chicago, MS in Applied Data Science. ADSP 32014 course project." src=".github/assets/banner-light.png">
+</picture>
+
 # Conditional Variational Autoencoders for Age Transformation in Facial Imagery
 
-**Date:** March 13, 2025
+> **Example project from Winter 2025.** This is a copy of [bhstoller/AgeTransform-VAE](https://github.com/bhstoller/AgeTransform-VAE), shown with the authors' work and commit history intact. Course staff made the edits listed under [Changes by course staff](#changes-by-course-staff).
 
-**Authors:** Bradley Stoller, Cassandra Maldonado, John Melel, and Kyler Rosen.
+Given one photo of a face, can a generative model show what that person looked like younger, or will look like older, while keeping them recognizable? The team answered this with a conditional variational autoencoder (CVAE) trained on 55,000 labeled face images, conditioned on age and gender.
 
-# Table of Contents
-- [Introduction](#introduction)
-- [Dataset](#dataset)
-- [Conditional VAE Implementation Methodology](#conditional-vae-implementation-methodology)
-- [Model Training and Baseline Comparison](#model-training-and-baseline-comparison)
-- [Data Preparation](#data-preparation)
-- [Data Preprocessing Challenges and Solutions](#data-preprocessing-challenges-and-solutions)
-- [Evaluation Metrics and Performance Assessment](#evaluation-metrics-and-performance-assessment)
-- [Key Challenges and Solutions](#key-challenges-and-solutions)
-- [Results: Age Transformation Simulation](#results-age-transformation-simulation)
-- [Age Variation GIFs](#age-variation-gifs)
-- [Conclusion and Future Directions](#conclusion-and-future-directions)
+![Age transformation examples](https://github.com/user-attachments/assets/29226943-95e9-4ce7-8449-c5c19ad1604d)
 
-## Introduction:
-<p align="justify">
-Our goal was to condition on age factors to enable age-controlled manipulation of facial images. To do this, we implemented a Conditional Variational Autoencoder (CVAE), leveraging age and gender conditions within our model to generate realistic and controllable age transformation of supplied photos of somebody's face.
-</p>
+## Summary
 
-![image](https://github.com/user-attachments/assets/29226943-95e9-4ce7-8449-c5c19ad1604d)
+A CVAE with a convolutional encoder and decoder was trained from scratch in PyTorch on the MORPH-2 dataset for 500 epochs. The encoder maps an image and its age and gender to a 256-dimensional latent code. The decoder reconstructs the image from that code and a condition vector, so decoding the same code with a different age produces the same person at a different age. The main engineering effort went into preprocessing: aligning eyes, masking the background, and matching brightness and color histograms to the training set, so that new photos, including the team's own, land in the distribution the model learned. Reconstructions are blurry, as expected from a VAE trained with a pixel-wise loss, but identity is preserved and the aging effect is visible and smooth. See [Results](#results).
 
-## Dataset:
-Morph-2 Dataset.
-Kurt Ricanek, and Tesfaye Tessema. (2023). MORPH-2 [Data set]. Kaggle. https://doi.org/10.34740/KAGGLE/DS/3576052
+## Team and contributions
 
-## Conditional VAE Implementation Methodology:
+- **Bradley Stoller** ([@bhstoller](https://github.com/bhstoller))
+- **Cassandra Maldonado** ([@CassandraMaldonado](https://github.com/CassandraMaldonado))
+- **John Melel** ([@johnmelel](https://github.com/johnmelel))
+- **Kyler Rosen** ([@KyKatRo](https://github.com/KyKatRo))
 
-### CVAE Architecture
-<p align="justify">
-Our Conditional VAE architecture (CVAE) consists of a CNN-based encoder that encodes face images and conditioning attributes (age and gender) into a latent space representation. Subsequently, our corresponding decoder reconstructs the images, conditioned on the latent representation and attributes, enabling effective attribute disentanglement and manipulation.
-</p>
+The project was built between February 6 and March 13, 2025. The [commit history](https://github.com/uchicago-dsi-bayesianml/wi25-age-transform-vae/commits/main) records who built what.
 
-![image](figures/architecture.png)
+## Getting started
 
-### 1. Input Image
-<p align="justify">
-  
-- The input image is a facial image with dimensions (128×128).
-- In order to keep the images conformed to a distribution, we preprocessed them by designing a separate ML algorithm to do the following:
-  	- Centers the eyes
-	- Mask the face
-	- Delete the background using the mask
-	- Transform the color distribution to minimize divergence from the dataset average
- 
-</p>
+Tested on an Apple Silicon Mac (the `mps` backend). CUDA and CPU also work; CPU training is slow.
 
-### 2. Encoder Network
-<p align="justify">
-  
-- The encoder consists of multiple convolutional layers that extract hierarchical features from the image:
-	- **Conv1 (16x):** Extracts low-level features like edges and textures.
-	- **Conv2 (32x):** Detects more complex patterns.
-	- **Conv3 (64x):** Captures mid-level structures like facial parts (eyes, nose, mouth).
-	- **Conv4 (128x):** Extracts high-level abstract representations.
-- The final encoded representation is flattened and passed through fully connected layers to compute the latent space representation.
+1. Clone the repository and install the dependencies.
 
-</p>
+   ```sh
+   git clone https://github.com/uchicago-dsi-bayesianml/wi25-age-transform-vae.git
+   cd wi25-age-transform-vae
+   python3 -m venv .venv && source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
 
-### 3. Latent Space (Middle)
-<p align="justify">
-  
-- The 256-dimension latent space consists of two key vectors:
-	- **Mu (Mean vector):** Represents the center of the learned latent distribution.
-	- **LogVar (Log Variance):** Defines the spread of the distribution.
-- A random latent representation is sampled using the reparameterization trick, ensuring differentiability for backpropagation.
+   `dlib` compiles from source and needs CMake and a C++ compiler. If that fails, `pip install dlib-bin` installs a prebuilt wheel.
 
-</p>
+2. Get the data. See [Data](#data). The notebooks expect it under `Dataset/`.
 
-### 4. Decoder Network
-<p align="justify">
-  
-- The decoder reconstructs the image from the latent space and the conditions (age, gender).
-- It uses transposed convolution layers (deconvolutions) to upsample the feature maps gradually.
-- The layers mirror the encoder:
-	- (128×128) **→** (64×64) **→** (32×32) **→** (16×16)
-- Each layer reconstructs more details of the image.
+3. Download dlib's face landmark model into the repository root. It is 99 MB and is not committed.
 
-</p>
+   ```sh
+   curl -LO http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2 && bunzip2 shape_predictor_68_face_landmarks.dat.bz2
+   ```
 
-### 5. Output (Reconstructed Image)
-<p align="justify">
-  
-- The final output is a reconstructed image with the same dimensions as the input.
-- If age manipulation is applied, the age-conditioned vector modifies the latent space to generate an aged (or de-aged) version of the face.
+4. Run the notebooks in this order.
 
-</p>
+   | Notebook | What it does |
+   |---|---|
+   | `fix_csv.ipynb` | Strips the Kaggle path prefix from the index files. |
+   | `conditional-dfc-model-large-images.ipynb` | Trains the CVAE for 500 epochs and writes one checkpoint per epoch to `checkpoints/`. Expect several gigabytes. |
+   | `conditional-dfc-model-viewer-large-images.ipynb` | Loads a checkpoint, reconstructs and ages test images, and runs your own photos through the alignment pipeline. Produces the figures and GIFs. |
+   | `figures.ipynb` | Training curves from the saved checkpoints, and the latent interpolation figure. |
 
-### Loss Functions
-<p align="justify">
-The training process utilized reconstruction loss (Mean Squared Error - MSE) and KL divergence loss to achieve image fidelity and latent space regularization.
-</p>
+   To age your own photos, put them in `Dataset/Team pics/` with a `team.csv` that has the columns `filepath`, `age` and `gender`, as in the index files.
 
-## Model Training and Baseline Comparison
+## Data
 
-Data was preprocessed with:
+Data files are never committed to this repository. Git ignores `Dataset/` and all checkpoints.
 
-- Image resizing to (128x128) pixels
-- Normalization of pixel values
+- **Source:** MORPH-2, about 55,000 longitudinal face images with age and gender labels. Kurt Ricanek and Tesfaye Tessema (2023). MORPH-2 [Data set]. Kaggle. https://doi.org/10.34740/KAGGLE/DS/3576052
+- **Terms:** MORPH is distributed under an academic license. Check the terms on Kaggle before downloading, and don't redistribute the images.
+- **How to get it:** download from Kaggle and unpack into `Dataset/`. The Kaggle release ships index files with `filepath`, `age` and `gender` columns. The notebooks read them as `Dataset/Index/train.csv`, `validation.csv` and `test.csv`, so rename them to lowercase on a case-sensitive filesystem.
+- **Where to put it:** `Dataset/Index/` for the CSV files, `Dataset/Images/` for the images, and `Dataset/Team pics/` for your own photos.
 
-### 1. Training from Scratch
-<p align="justify">
-We trained the Conditional VAE from scratch using PyTorch. The model was optimized using the Adam optimizer with a learning rate of 0.0008 for 500 epochs. Training was performed on the Apple MPS backend (ARM-based MacBook Pro), so the model was optimized for M-Class architectures.
-</p>
+The `EDA/` folder also explores CACD and IMDB-WIKI, two other face datasets the team considered before settling on MORPH-2.
 
-![training curve](figures/training_curve.png)
+## Project structure
 
-### 2. Architecture Inspiration
-<p align="justify">
-While training from scratch, we referenced architectures such as ResNet-like CNNs to inform our design for efficient feature extraction. These architectures provided a solid foundation for building an effective encoder and decoder.
-</p>
+| Path | Contents |
+|---|---|
+| `dataset.py` | `MorphII_Dataset`, a PyTorch dataset that reads an index CSV and returns an image with its `[age/100, gender]` condition. |
+| `conditional-dfc-model-large-images.ipynb` | Model definition and training loop. |
+| `conditional-dfc-model-viewer-large-images.ipynb` | Evaluation, the face alignment pipeline, aging sweeps, GIFs. |
+| `figures.ipynb` | Training curves and latent interpolation. |
+| `fix_csv.ipynb`, `morphII_lighting_distribution_analysis.ipynb`, `morphii_train_stats.csv` | Index cleanup, and the brightness and histogram statistics of the training set that the alignment pipeline matches new photos to. |
+| `EDA/` | Exploration of MORPH-2, CACD and IMDB-WIKI, and an eye-finder prototype. |
+| `old_architectures/` | Earlier attempts: a β-VAE, a perceptual-loss variant, and 64×64 models. See the note inside. |
+| `figures/` | All figures in this README, and the script that draws the architecture diagram. |
 
+The `dfc` in the notebook names is left over from an earlier deep-feature-consistent variant with a VGG perceptual loss, kept in `old_architectures/`. The final model uses a pixel-wise reconstruction loss.
 
-## Data Preparation
+## Method
 
-### 1. Morph-2 Dataset
-<p align="justify">
-We used the Morph-2 dataset, consisting of around 55,000 labeled face images collected longitudinally from mugshots. This dataset provided a rich source of data for training our model, including metadata such as age and gender as gathered by the government.
-</p>
+![CVAE architecture](figures/architecture.png)
 
-### 2. Addressing Data Imbalance
-<p align="justify">
-Recognizing the dataset’s inherent imbalances (fewer samples for older individuals), we implemented several preprocessing steps to improve training quality and ensure fair representation across age ranges.
-</p>
+**Encoder.** Four stride-2 convolutional blocks (16, 32, 64 and 128 channels, each with batch normalization and LeakyReLU) take a 128×128 image down to 128×8×8. The flattened features are concatenated with the condition vector and two linear layers produce the mean and log-variance of a 256-dimensional Gaussian over the latent code.
 
-## Data Preprocessing Challenges and Solutions
-<p align="justify">
-One of the most time-consuming and technically challenging aspects of our project was ensuring consistency in image backgrounds, framing, and lighting. Without addressing these factors, the model struggled to learn a clean latent representation of age, as variations in background color, head positioning, and brightness introduced unwanted noise. Specifically, we faced the following challenges:
-</p>
+**Decoder.** The latent code and the condition vector pass through a linear layer back to 128×8×8, then four transposed convolutions mirror the encoder up to 128×128×3.
 
-### 1.	Background Inconsistency:
-<p align="justify">
-Images in our dataset had highly varied backgrounds, ranging from plain walls to complex, multicolored environments. This made it difficult for the model to focus on facial features rather than irrelevant background information.
-</p>
+**Loss.** Mean squared reconstruction error plus the KL divergence between the encoder's Gaussian and a standard normal prior, averaged over the batch. Adam with a learning rate of 0.0008, batch size 128, 500 epochs. Images are normalized to [-1, 1].
 
-### 2.	Framing and Alignment Issues: 
-<p align="justify">
-Face images were not consistently aligned, with variations in head tilt, positioning, and scale affecting training quality. Without proper alignment, the model had difficulty learning smooth age transformations.
-</p>
+**Preprocessing for new photos.** The model only generalizes to photos that look like its training set. For each new photo, the pipeline detects the face and 68 landmarks with dlib, rotates and scales so the eyes sit at fixed positions, masks the face, replaces the background with a flat grey, and adjusts brightness and matches the color histogram inside the mask to the training-set statistics in `morphii_train_stats.csv`.
 
-### 3.	Lighting Variability:
-<p align="justify">
-Different images had different exposure levels, making it harder for the model to generalize across lighting conditions.
-</p>
+### What is Bayesian here
 
-## Evaluation Metrics and Performance Assessment
+The VAE is amortized variational inference. The encoder is the approximate posterior over the latent code, a Gaussian whose mean and variance are functions of the image and the condition. The decoder is the likelihood of the image given the code and the condition, and the prior on the code is a standard normal. The training loss is the negative evidence lower bound: a reconstruction term that is the Gaussian log-likelihood up to a constant, which is where the mean squared error comes from, plus the KL term that keeps the posterior close to the prior. The reparameterization trick makes a one-sample Monte Carlo estimate of this bound differentiable.
 
-### Reconstruction Accuracy
-<p align="justify">
-We assessed the model’s performance using reconstruction accuracy, measured by MSE (Mean Squared Error). This metric provided insight into how well the model could reconstruct input images after encoding and decoding.
-</p>
+Conditioning the encoder and decoder on age and gender is what makes age editing possible. The KL term pushes the code to carry only what the condition does not explain, so at decode time the code holds identity and the condition holds age. Sampling the code several times for the same photo gives different plausible reconstructions. That spread is the posterior uncertainty over the latent representation.
 
-### Latent Space Disentanglement
-<p align="justify">
-To normalize the latent space, we used KL-Divergence. This allowed us to tame the latent space in a way such that conditioning could stay uncorrelated with the latent vectors.
-</p>
+## Results
 
-## Key Challenges and Solutions
+Training converges within roughly 100 epochs and is flat afterwards. The reconstruction term dominates the loss.
 
-### Dataset Imbalance
-<p align="justify">
-The Morph-2 dataset had a notable racial imbalance, with fewer samples for minority individuals, skewing the model’s learning. To mitigate this, we employed data augmentation techniques and weighted loss functions to ensure fairer representation across all races.
-</p>
+![Training curves](figures/training_curve.png)
 
-### Disentanglement Complexity
-<p align="justify">
-Achieving effective disentanglement of age from other facial features proved challenging. For this reason, we switched from a disentanglement to a conditional approach. We conducted extensive experiments to find an optimal architecture that balanced reconstruction quality and conditioning performance.
-</p>
+Reconstructions of held-out test images and of the team's own photos. They are blurry, which is the usual effect of a pixel-wise loss averaging over plausible details, but the identifying features survive.
 
-## Results: Age Transformation Simulation
+![Reconstruction of test images](figures/test_reconstruction.png)
 
-Reconstructions were slightly blurry which is an expected sideeffect of VAEs as they are essentially hill climbers on distributions, but still managed to gather key idenitfying features.
+![Reconstruction of the team's photos](figures/team_reconstruction.png)
 
-![reconstruction of test set](figures/test_reconstruction.png)
+Interpolating between the latent codes of two team members moves smoothly from one face to the other.
 
-![reconstruction of development team](figures/team_reconstruction.png)
+![Latent interpolation](figures/latent_interpolation.png)
 
-![interpolations](figures/latent_interpolation.png)
+Decoding one latent code with a sweep of age values. Age labels on the figures follow the authors' mapping of the condition value to years.
 
-### Aging Simulation
-<p align="justify">
-Our age transformation simulation demonstrated the model’s ability to realistically age faces. By manipulating the age shift vector in latent space, we generated plausible aging effects while preserving the individual’s identity.
-</p>
+![Aging of test images](figures/test_age.png)
 
-![aging of test set](figures/test_age.png)
+![Aging of the team's photos](figures/team_age.png)
 
-![aging of development team](figures/team_age.png)
+### Age variation GIFs
 
-## Age Variation GIFs
+| Batu | Brad | Casey |
+|---|---|---|
+| <img src="figures/gifs/age_variation_Batu.gif" width="250"> | <img src="figures/gifs/age_variation_Brad.gif" width="250"> | <img src="figures/gifs/age_variation_Casey.gif" width="250"> |
 
-### Batu
-<img src="figures/gifs/age_variation_Batu.gif" width="400">
+| John | Kyler |
+|---|---|
+| <img src="figures/gifs/age_variation_John.gif" width="250"> | <img src="figures/gifs/age_variation_Kyler.gif" width="250"> |
 
-### Brad
-<img src="figures/gifs/age_variation_Brad.gif" width="400">
+## Challenges
 
-### Casey
-<img src="figures/gifs/age_variation_Casey.gif" width="400">
+**Backgrounds, framing and lighting.** The most time-consuming part of the project. Varied backgrounds, head positions and exposure levels kept the model from learning a clean representation of age, and new photos taken outside the dataset's conditions reconstructed poorly. The alignment and masking pipeline described under [Method](#method) was the answer.
 
-### John
-<img src="figures/gifs/age_variation_John.gif" width="400">
+**Disentanglement.** The team first tried to make a β-VAE discover an age direction in an unsupervised latent space, on IMDB-WIKI and then MORPH-2. The age factor never separated cleanly, so they switched to conditioning on age explicitly. Those attempts are in `old_architectures/`.
 
-### Kyler
-<img src="figures/gifs/age_variation_Kyler.gif" width="400">
+**Dataset imbalance.** MORPH-2 has far fewer images of older people and an uneven racial composition. The team noted this as a limitation. The final model does not correct for it, so aging results are weakest for the under-represented groups.
 
-## Conclusion and Future Directions
+## Conclusion and future directions
 
-### Summary of Work
-<p align="justify">
-We successfully implemented an age-conditioned VAE for disentangling latent age factors in face images. We addressed data imbalance, optimized the model architecture, and achieved realistic age transformation simulations.
-</p>
+An age-conditioned VAE can produce controllable, identity-preserving aging from a single photo, provided the input is brought into the training distribution first. Sharper results would need a perceptual or adversarial reconstruction term, which the team explored but did not finish. Other directions are additional conditioning attributes, class-balanced training to address the imbalance above, and applying the same pipeline to other image domains.
 
-### Key Findings
-<p align="justify">
-Our work highlights the effectiveness of CVAEs for controlled attribute manipulation in facial images. The age-conditioned loss function and careful hyperparameter tuning were crucial for achieving high-quality results.
-</p>
+## About this project
 
-### Future Work
-<p align="justify">
-Future directions include exploring more advanced disentanglement techniques, incorporating additional facial attributes, and applying the model to other image datasets.
-</p>
+This project was built in Bayesian Machine Learning with Generative AI Applications (ADSP 32014), part of the Master of Science in Applied Data Science at the University of Chicago, in Winter 2025. It is shown here as an example for later cohorts.
+
+## Changes by course staff
+
+Course staff forked the authors' repository and made these edits. The authors' commits are unchanged.
+
+- Rewrote this README in the course's project layout, keeping the authors' text where it matched the code. Removed statements about weighted losses, data augmentation and an age-conditioned loss, which the code never had. Added the sections on getting started, data, project structure and what is Bayesian here.
+- Removed an unrelated notebook added in November 2025, a 99 MB dlib model file that is now downloaded in [Getting started](#getting-started), and HTML fragments of an earlier β-VAE presentation that the final write-up had superseded.
+- Removed one cell from `figures.ipynb` that drew a bar chart of "performance metrics" from hardcoded numbers rather than measurements.
+- Added `requirements.txt`, a note in `old_architectures/`, and the program banner.
+
+## License
+
+MIT, held by the authors. See [LICENSE](LICENSE).
