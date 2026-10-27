@@ -1,0 +1,18 @@
+# Final pipeline: training, evaluation, face alignment, figures and GIFs.
+torch
+torchvision
+numpy
+pandas
+matplotlib
+opencv-python
+dlib            # or dlib-bin, if compiling fails
+Pillow
+tqdm
+imageio
+jupyter
+
+# Only for the exploratory notebooks in EDA/ and old_architectures/.
+# seaborn
+# scipy
+# lpips
+# deeplake
